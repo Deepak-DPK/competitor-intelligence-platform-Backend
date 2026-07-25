@@ -61,14 +61,25 @@ COPY --from=builder /opt/venv /opt/venv
 COPY --from=builder /opt/playwright /opt/playwright
 
 # Runtime OS libraries required by asyncpg / psycopg / lxml
-# Plus install Playwright OS dependencies using playwright CLI
+# Plus explicit manual installation of Playwright OS dependencies for Chromium headless
 RUN apt-get update && apt-get install -y --no-install-recommends \
         libpq5 \
         libxml2 \
         libxslt1.1 \
-    && playwright install-deps chromium \
+        # Playwright runtime deps (Chromium headless)
+        libnss3 \
+        libnspr4 \
+        libatk1.0-0 \
+        libatk-bridge2.0-0 \
+        libcups2 \
+        libdrm2 \
+        libxkbcommon0 \
+        libxcomposite1 \
+        libxdamage1 \
+        libxrandr2 \
+        libgbm1 \
+        libasound2 \
     && rm -rf /var/lib/apt/lists/*
-
 # Copy application source
 COPY . .
 
