@@ -50,6 +50,13 @@ class Settings(BaseSettings):
         "Format: postgresql+asyncpg://USER:PASSWORD@HOST:5432/postgres",
     )
 
+    @field_validator("DATABASE_URL", mode="before")
+    @classmethod
+    def assemble_db_url(cls, v: str) -> str:
+        if v and v.startswith("postgresql://"):
+            return v.replace("postgresql://", "postgresql+asyncpg://", 1)
+        return v
+
     # ------------------------------------------------------------------ #
     # Supabase
     # ------------------------------------------------------------------ #
