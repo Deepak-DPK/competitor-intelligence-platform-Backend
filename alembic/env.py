@@ -38,7 +38,8 @@ import app.models  # noqa: F401  (registers models against Base.metadata)
 config = context.config
 
 # Override sqlalchemy.url from config file with the runtime value
-config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
+# We replace '%' with '%%' to prevent configparser from treating password characters (like %40) as interpolation variables.
+config.set_main_option("sqlalchemy.url", settings.DATABASE_URL.replace("%", "%%"))
 
 # Interpret the config file for Python logging (if present)
 if config.config_file_name is not None:
