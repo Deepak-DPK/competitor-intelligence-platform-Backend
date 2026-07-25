@@ -7,7 +7,8 @@ Responsibilities:
 - Instantiate the FastAPI app with metadata
 - Register CORS middleware (restricted to FRONTEND_URL in production)
 - Register custom middlewares (request-ID, access log)
-- Mount the /api/v1 router
+- Mount the /api/v1 router (health + auth in Phase 3)
+- Wire AppException → HTTP status code handlers
 - Configure startup / shutdown lifespan events
 - Expose the app object for Uvicorn:  uvicorn app.main:app
 """
@@ -119,6 +120,22 @@ def create_application() -> FastAPI:
     # ---------------------------------------------------------------- #
     # Global exception handlers
     # ---------------------------------------------------------------- #
+    from app.utils.exceptions import AppException
+
+    @app.exception_handler(AppException)
+    async def app_exception_handler(request: Request, exc: AppException) -> JSONResponse:
+        """
+        Translate domain exceptions (NotFoundException, UnauthorizedException, etc.)
+        into the correct HTTP response automatically.
+        """
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={
+                "detail": exc.detail,
+                "request_id": getattr(request.state, "request_id", None),
+                **exc.extra,
+            },
+        )
 
     @app.exception_handler(Exception)
     async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:

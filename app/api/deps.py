@@ -1,79 +1,39 @@
 """
 app/api/deps.py
 ---------------
-Shared FastAPI dependency functions.
+Shared FastAPI dependency functions — single source of truth.
 
-All route files import their dependencies from here to ensure a single
-source of truth.  New dependencies (e.g. pagination, permissions) are
-added here and nowhere else.
+Phase 3 update: re-exports auth dependencies from app.auth.dependencies
+so all route files can import from one place.
+
+Import pattern in route files:
+    from app.api.deps import DBSession, CurrentUser, CurrentUserId, Pagination
 """
 
 from typing import Annotated, Optional
 from uuid import UUID
 
-from fastapi import Depends, Header, HTTPException, status
-from jwt.exceptions import ExpiredSignatureError, InvalidTokenError
+from fastapi import Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.logging import get_logger
-from app.core.security import verify_supabase_jwt
+from app.auth.dependencies import (   # noqa: F401 — re-exported
+    AuthSvc,
+    CurrentUser,
+    CurrentUserId,
+    OptionalUser,
+    get_auth_service,
+    get_current_user,
+    get_current_user_id,
+    get_optional_user,
+    require_role,
+)
 from app.database.session import get_db
 
-logger = get_logger(__name__)
-
-
 # ------------------------------------------------------------------ #
-# Type aliases (for cleaner route signatures)
+# DB session type alias
 # ------------------------------------------------------------------ #
 
 DBSession = Annotated[AsyncSession, Depends(get_db)]
-
-
-# ------------------------------------------------------------------ #
-# Auth dependency
-# ------------------------------------------------------------------ #
-
-async def get_current_user_id(
-    authorization: Annotated[Optional[str], Header()] = None,
-) -> UUID:
-    """
-    Extracts and verifies the Supabase JWT from the Authorization header.
-
-    Returns the user UUID (`sub` claim) on success.
-    Raises HTTP 401 on missing / invalid / expired tokens.
-
-    Full user-object lookup will be wired in Phase 2 once the User model
-    exists.  For now this returns the raw UUID.
-    """
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-
-    if not authorization:
-        raise credentials_exception
-
-    scheme, _, token = authorization.partition(" ")
-    if scheme.lower() != "bearer" or not token:
-        raise credentials_exception
-
-    try:
-        payload = verify_supabase_jwt(token)
-        user_id: Optional[str] = payload.get("sub")
-        if not user_id:
-            raise credentials_exception
-        return UUID(user_id)
-    except (ExpiredSignatureError, InvalidTokenError, ValueError) as exc:
-        logger.warning("JWT verification failed: %s", exc)
-        raise credentials_exception from exc
-
-
-# ------------------------------------------------------------------ #
-# Convenience annotated types for routes
-# ------------------------------------------------------------------ #
-
-CurrentUserId = Annotated[UUID, Depends(get_current_user_id)]
 
 
 # ------------------------------------------------------------------ #
@@ -81,7 +41,7 @@ CurrentUserId = Annotated[UUID, Depends(get_current_user_id)]
 # ------------------------------------------------------------------ #
 
 class PaginationParams:
-    """Common pagination query parameters."""
+    """Common pagination query parameters for list endpoints."""
 
     def __init__(self, page: int = 1, page_size: int = 20) -> None:
         if page < 1:
@@ -94,3 +54,26 @@ class PaginationParams:
 
 
 Pagination = Annotated[PaginationParams, Depends(PaginationParams)]
+
+# ------------------------------------------------------------------ #
+# Public re-exports (everything routes should need from this file)
+# ------------------------------------------------------------------ #
+
+__all__ = [
+    # DB
+    "DBSession",
+    "get_db",
+    # Auth
+    "AuthSvc",
+    "CurrentUser",
+    "CurrentUserId",
+    "OptionalUser",
+    "get_auth_service",
+    "get_current_user",
+    "get_current_user_id",
+    "get_optional_user",
+    "require_role",
+    # Pagination
+    "Pagination",
+    "PaginationParams",
+]
