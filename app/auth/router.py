@@ -16,21 +16,19 @@ Endpoints:
 
 All endpoints use dependency injection from app/auth/dependencies.py.
 No database or Supabase logic lives in this file — pure routing + HTTP.
+
+Refactor notes (Phase 3 review):
+  - Removed unused imports (Request, Depends, get_auth_service, get_current_user).
+  - Removed stray `from uuid import UUID` inside update_me body.
 """
 
-from fastapi import APIRouter, Depends, Header, Request, status
 from typing import Annotated, Optional
 
-from app.auth.dependencies import (
-    AuthSvc,
-    CurrentUser,
-    CurrentUserId,
-    get_auth_service,
-    get_current_user,
-)
+from fastapi import APIRouter, Header, status
+
+from app.auth.dependencies import AuthSvc, CurrentUser
 from app.core.constants import AUTH_TAG
 from app.core.logging import get_logger
-from app.models.user import User
 from app.schemas.auth import (
     AuthResponse,
     LoginRequest,
@@ -60,7 +58,7 @@ router = APIRouter(prefix="/auth", tags=[AUTH_TAG])
     description=(
         "Creates a new user account via Supabase Auth and mirrors the profile "
         "into the local database. Returns tokens immediately if email confirmation "
-        "is disabled; otherwise returns an empty token pair until the email is confirmed."
+        "is disabled; otherwise returns an empty token pair until confirmed."
     ),
 )
 async def register(
@@ -99,7 +97,7 @@ async def login(
     summary="Refresh access token",
     description=(
         "Exchanges a valid Supabase refresh token for a new access token + "
-        "rotated refresh token.  The old refresh token is immediately invalidated."
+        "rotated refresh token. The old refresh token is immediately invalidated."
     ),
 )
 async def refresh_token(
@@ -119,8 +117,8 @@ async def refresh_token(
     status_code=status.HTTP_200_OK,
     summary="Logout — invalidate session",
     description=(
-        "Revokes the Supabase session server-side.  The client should also "
-        "discard both tokens from storage."
+        "Revokes the Supabase session server-side. The client should also "
+        "discard both tokens from local storage."
     ),
 )
 async def logout(
@@ -128,7 +126,6 @@ async def logout(
     service: AuthSvc,
     authorization: Annotated[Optional[str], Header()] = None,
 ) -> MessageResponse:
-    # Extract raw bearer token for Supabase set_session call
     token = ""
     if authorization and authorization.lower().startswith("bearer "):
         token = authorization.split(" ", 1)[1]
@@ -161,12 +158,14 @@ async def get_me(
     response_model=UserResponse,
     status_code=status.HTTP_200_OK,
     summary="Update current user profile",
-    description="Updates mutable profile fields (full_name, avatar_url) for the authenticated user.",
+    description=(
+        "Updates mutable profile fields (full_name, avatar_url) "
+        "for the authenticated user."
+    ),
 )
 async def update_me(
     payload: UpdateProfileRequest,
     current_user: CurrentUser,
     service: AuthSvc,
 ) -> UserResponse:
-    from uuid import UUID
     return await service.update_profile(current_user.id, payload)

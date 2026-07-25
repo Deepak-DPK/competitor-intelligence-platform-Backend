@@ -7,33 +7,27 @@ This layer sits between the router (HTTP) and the repository (DB).
 It orchestrates:
   1. Supabase Auth API calls (sign-up, sign-in, refresh, sign-out)
   2. Local user record sync (mirror Supabase auth.users into public.users)
-  3. JWT token management (for internal tokens)
-  4. Password hashing (for non-Supabase flows if needed)
 
 Architecture decision:
   Supabase Auth is the PRIMARY identity provider.
-  - Supabase issues and manages the refresh token lifecycle.
+  - Supabase issues and manages access + refresh token lifecycle.
   - We trust Supabase JWTs and mirror the user profile locally.
-  - The local ``users`` table is a projection of Supabase's auth.users.
+  - The local ``users`` table is a projection of Supabase auth.users.
+
+Refactor notes (Phase 3 review):
+  - Removed unused imports (httpx, internal JWT helpers, hash_password).
+  - Fixed UUID(int=0) anti-pattern in refresh_token — now raises properly.
+  - Supabase client created once per service method, not once per sub-call.
 """
 
 from typing import Optional
 from uuid import UUID
 
-import httpx
 from supabase import AsyncClient as SupabaseAsyncClient, create_async_client
 
 from app.auth.repository import AuthRepository
 from app.core.config import settings
 from app.core.logging import get_logger
-from app.core.security import (
-    create_access_token,
-    create_refresh_token,
-    decode_access_token,
-    decode_refresh_token,
-    hash_password,
-    verify_password,
-)
 from app.models.user import User
 from app.schemas.auth import (
     AuthResponse,
@@ -65,16 +59,15 @@ async def _get_supabase() -> SupabaseAsyncClient:
 
 
 # ------------------------------------------------------------------ #
-# Helper: build TokenResponse from settings
+# Helper: build TokenResponse
 # ------------------------------------------------------------------ #
 
-def _build_tokens(user_id: UUID, supabase_access: str, supabase_refresh: str) -> TokenResponse:
+def _build_tokens(supabase_access: str, supabase_refresh: str) -> TokenResponse:
     """
-    Return a TokenResponse.
+    Wrap Supabase tokens in a typed response.
 
-    We prefer Supabase's own access token (already signed with SUPABASE_JWT_SECRET)
+    We return Supabase's own access token (signed with SUPABASE_JWT_SECRET)
     so the frontend can call Supabase Storage / RLS-protected tables directly.
-    The refresh token is always Supabase-managed (opaque string).
     """
     return TokenResponse(
         access_token=supabase_access,
@@ -107,12 +100,12 @@ class AuthService:
         Register a new user.
 
         Flow:
-          1. Check local DB for duplicate email.
+          1. Check local DB for duplicate email (fast, no Supabase round-trip).
           2. Call Supabase Auth sign-up (creates auth.users record).
-          3. Mirror user into public.users with the Supabase UUID.
+          3. Mirror user into public.users using the Supabase UUID.
           4. Return AuthResponse with tokens + profile.
         """
-        # 1. Duplicate check (fast — avoids round-trip to Supabase)
+        # 1. Duplicate check
         if await self._repo.email_exists(payload.email):
             raise ConflictException("An account with this email already exists.")
 
@@ -125,7 +118,7 @@ class AuthService:
         except Exception as exc:
             logger.error("Supabase sign-up failed: %s", exc)
             raise UnauthorizedException(
-                "Registration failed. Please check your email and try again."
+                "Registration failed. Please try again."
             ) from exc
 
         if not resp.user:
@@ -141,12 +134,11 @@ class AuthService:
         )
 
         # 4. Build response
-        #    Supabase may require email confirmation — if session is None, tokens are empty.
+        # Supabase may require email confirmation — if session is None, tokens are empty.
         session = resp.session
         if session:
-            tokens = _build_tokens(user.id, session.access_token, session.refresh_token)
+            tokens = _build_tokens(session.access_token, session.refresh_token)
         else:
-            # Email confirmation required — no tokens yet
             tokens = TokenResponse(
                 access_token="",
                 refresh_token="",
@@ -166,7 +158,7 @@ class AuthService:
         Authenticate an existing user with email + password.
 
         Flow:
-          1. Call Supabase Auth sign-in (validates password in Supabase).
+          1. Call Supabase Auth sign-in (Supabase validates the password).
           2. Upsert user in public.users (keeps profile in sync).
           3. Return AuthResponse.
         """
@@ -184,17 +176,17 @@ class AuthService:
 
         supabase_user_id = UUID(str(resp.user.id))
 
-        # Upsert local user record
+        # Upsert local user record (handles first-login-after-DB-reset)
         user = await self._repo.get_by_id(supabase_user_id)
         if user is None:
-            # First login after manual DB reset or migration — create local record
+            meta = resp.user.user_metadata or {}
             user = await self._repo.create(
                 email=payload.email,
-                full_name=resp.user.user_metadata.get("full_name") if resp.user.user_metadata else None,
+                full_name=meta.get("full_name"),
                 supabase_id=supabase_user_id,
             )
 
-        tokens = _build_tokens(user.id, resp.session.access_token, resp.session.refresh_token)
+        tokens = _build_tokens(resp.session.access_token, resp.session.refresh_token)
         logger.info("User logged in", extra={"user_id": str(user.id)})
         return AuthResponse(user=UserResponse.model_validate(user), tokens=tokens)
 
@@ -207,6 +199,7 @@ class AuthService:
         Exchange a Supabase refresh token for a new access token.
 
         Supabase rotates the refresh token on each use (rolling refresh).
+        Raises UnauthorizedException if the token is expired or invalid.
         """
         supabase = await _get_supabase()
         try:
@@ -216,11 +209,13 @@ class AuthService:
             raise UnauthorizedException("Invalid or expired refresh token.") from exc
 
         if not resp.session:
-            raise UnauthorizedException("Token refresh failed.")
+            raise UnauthorizedException("Token refresh failed — no session returned.")
 
-        user_id = UUID(str(resp.user.id)) if resp.user else UUID(int=0)
-        logger.info("Token refreshed", extra={"user_id": str(user_id)})
-        return _build_tokens(user_id, resp.session.access_token, resp.session.refresh_token)
+        if not resp.user:
+            raise UnauthorizedException("Token refresh failed — could not identify user.")
+
+        logger.info("Token refreshed", extra={"user_id": str(resp.user.id)})
+        return _build_tokens(resp.session.access_token, resp.session.refresh_token)
 
     # ---------------------------------------------------------------- #
     # Logout
@@ -231,14 +226,13 @@ class AuthService:
         Sign the user out by invalidating the session on Supabase.
 
         Supabase revokes the refresh token server-side so it cannot be reused.
+        We log but never raise — clients must discard tokens regardless of outcome.
         """
         supabase = await _get_supabase()
         try:
-            # Set the user's session so Supabase knows which session to revoke
             await supabase.auth.set_session(access_token, payload.refresh_token or "")
             await supabase.auth.sign_out()
         except Exception as exc:
-            # Log but don't fail — client should discard tokens regardless
             logger.warning("Supabase sign-out encountered an error: %s", exc)
 
         logger.info("User logged out")

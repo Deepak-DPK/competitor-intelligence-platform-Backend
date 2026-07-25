@@ -12,6 +12,8 @@ from fastapi import APIRouter
 
 from app.api.v1.health import router as health_router
 from app.auth.router import router as auth_router
+from app.api.v1.projects import router as projects_router
+from app.api.v1.competitors import router as competitors_router
 
 # ------------------------------------------------------------------ #
 # v1 parent router
@@ -22,10 +24,9 @@ api_v1_router = APIRouter()
 # Registered routers
 # Phase 1: health
 # Phase 3: auth
+# Phase 4: projects, competitors
 #
 # Future phases:
-#   from app.api.v1.projects    import router as projects_router
-#   from app.api.v1.competitors import router as competitors_router
 #   from app.api.v1.monitoring  import router as monitoring_router
 #   from app.api.v1.dashboard   import router as dashboard_router
 #   from app.api.v1.reports     import router as reports_router
@@ -35,3 +36,5 @@ api_v1_router = APIRouter()
 
 api_v1_router.include_router(health_router)
 api_v1_router.include_router(auth_router)
+api_v1_router.include_router(projects_router)
+api_v1_router.include_router(competitors_router)

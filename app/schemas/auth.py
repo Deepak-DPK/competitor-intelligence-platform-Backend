@@ -68,6 +68,7 @@ class LogoutRequest(BaseModel):
 
     refresh_token: Optional[str] = Field(
         default=None,
+        min_length=1,
         description="Refresh token to invalidate on Supabase. "
                     "If omitted, only the access token is discarded client-side.",
     )

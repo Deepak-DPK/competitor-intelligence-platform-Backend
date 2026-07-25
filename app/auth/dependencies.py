@@ -13,6 +13,10 @@ Provides:
 
 All routes import their dependencies from this module or from
 app/api/deps.py (which re-exports the common ones).
+
+Refactor notes (Phase 3 review):
+  - Removed unused ForbiddenException / UnauthorizedException imports.
+  - Fixed require_admin() return type (returns a Depends() call, not User).
 """
 
 from typing import Annotated, Optional
@@ -29,7 +33,6 @@ from app.core.logging import get_logger
 from app.core.security import verify_supabase_jwt
 from app.database.session import get_db
 from app.models.user import User
-from app.utils.exceptions import ForbiddenException, UnauthorizedException
 
 logger = get_logger(__name__)
 
@@ -194,8 +197,14 @@ def require_role(*allowed_roles: UserRole):
 # Convenience shortcuts
 # ------------------------------------------------------------------ #
 
-def require_admin() -> User:
-    """Shortcut: restrict route to admin users only."""
+def require_admin():
+    """Shortcut: restrict route to admin users only.
+    
+    Usage:
+        @router.get("/admin")
+        async def admin_route(user: User = require_admin()):
+            ...
+    """
     return Depends(require_role(UserRole.ADMIN))
 
 
