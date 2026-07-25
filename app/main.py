@@ -43,8 +43,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """
     Runs code on application startup and shutdown.
 
-    Startup  → verify DB connectivity, warm connection pool.
-    Shutdown → dispose engine, release all connections.
+    Startup  → verify DB connectivity, warm connection pool, start monitoring worker/scheduler.
+    Shutdown → cancel tasks, dispose engine, release all connections.
     """
     # ---- Startup ----
     logger.info(
@@ -64,9 +64,21 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     except Exception as exc:  # noqa: BLE001
         logger.warning("Database warmup skipped (will retry on first request): %s", exc)
 
+    # Start monitoring background tasks
+    import asyncio
+    from app.services.monitoring.worker import monitoring_worker
+    from app.services.monitoring.scheduler import monitoring_scheduler
+    
+    worker_task = asyncio.create_task(monitoring_worker())
+    scheduler_task = asyncio.create_task(monitoring_scheduler())
+
     yield  # ←— application runs here
 
     # ---- Shutdown ----
+    logger.info("Shutting down %s — cancelling background tasks", settings.APP_NAME)
+    worker_task.cancel()
+    scheduler_task.cancel()
+    
     logger.info("Shutting down %s — disposing engine", settings.APP_NAME)
     await engine.dispose()
     logger.info("Engine disposed. Goodbye.")
