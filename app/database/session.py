@@ -37,14 +37,23 @@ def _make_engine() -> AsyncEngine:
     if settings.is_production:
         connect_args["ssl"] = "require"
 
+    kwargs = {
+        "echo": settings.DEBUG,
+        "pool_pre_ping": True,
+        "pool_recycle": 1800,
+        "connect_args": connect_args,
+    }
+
+    # SQLite does not support pool_size and max_overflow
+    if not settings.DATABASE_URL.startswith("sqlite"):
+        kwargs["pool_size"] = 5
+        kwargs["max_overflow"] = 10
+    else:
+        connect_args["check_same_thread"] = False
+
     engine = create_async_engine(
         settings.DATABASE_URL,
-        echo=settings.DEBUG,           # log SQL in debug mode
-        pool_pre_ping=True,            # heartbeat before every checkout
-        pool_size=5,                   # suitable for Render starter tier
-        max_overflow=10,               # burst headroom
-        pool_recycle=1800,             # recycle connections every 30 min
-        connect_args=connect_args,
+        **kwargs,
     )
     logger.info("Database engine created", extra={"url": settings.DATABASE_URL[:40] + "..."})
     return engine
