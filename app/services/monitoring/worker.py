@@ -46,7 +46,20 @@ async def execute_job(job: ScrapeJob, db: AsyncSession):
         logger.error("Unknown module type", extra={"module_type": job.module_type})
         return
 
-    await scraper.run(job.competitor_id, job.url or "")
+    snapshot = await scraper.run(job.competitor_id, job.url or "")
+    
+    # After a successful scrape, run the change detection engine
+    from app.services.ai.change_detection import ChangeDetectionEngine
+    detector = ChangeDetectionEngine(db)
+    change_log = await detector.process_snapshot(snapshot)
+    
+    # If a change is detected, we trigger the AI Insight generation here
+    if change_log:
+        logger.info("Triggering AI Insight Generation for ChangeLog", extra={"change_log_id": str(change_log.id)})
+        from app.services.ai.gemini import AIService
+        ai_service = AIService(db)
+        await ai_service.generate_insight(change_log)
+        
     await db.commit()
 
 
