@@ -59,6 +59,17 @@ class ChangeDetectionEngine:
             await self._db.flush()
             logger.info("Change detected and logged", extra={"change_log_id": str(change_log.id)})
             
+            # Fetch the project_id associated with the competitor
+            from app.models.competitor import Competitor
+            stmt = select(Competitor.project_id).where(Competitor.id == snapshot.competitor_id)
+            proj_result = await self._db.execute(stmt)
+            project_id = proj_result.scalar_one_or_none()
+            
+            if project_id:
+                from app.services.alert import AlertService
+                alert_service = AlertService(self._db)
+                await alert_service.create_alert_from_change(project_id, change_log)
+            
         return change_log
 
     async def _detect_website_change(self, current: WebsiteSnapshot) -> Optional[ChangeLog]:
