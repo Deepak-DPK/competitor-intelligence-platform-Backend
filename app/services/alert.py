@@ -7,7 +7,7 @@ Service layer for Alerts.
 from typing import List, Optional
 from uuid import UUID
 
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.constants import AlertSeverity, ChangeSeverity
@@ -22,12 +22,15 @@ class AlertService:
     async def get_alerts(
         self,
         project_id: UUID,
+        pagination: "PaginationParams",
+        search: "SearchParams",
+        sort: "SortParams",
         is_read: Optional[bool] = None,
         severity: Optional[str] = None,
-        limit: int = 50,
-        offset: int = 0
-    ) -> List[Alert]:
-        """Fetches alerts for a project with optional filters."""
+    ) -> "PaginatedResponse[Alert]":
+        """Fetches alerts for a project with optional filters and pagination."""
+        from app.schemas.common import PaginatedResponse
+
         stmt = select(Alert).where(Alert.project_id == project_id)
         
         if is_read is not None:
@@ -35,9 +38,31 @@ class AlertService:
         if severity is not None:
             stmt = stmt.where(Alert.severity == severity)
             
-        stmt = stmt.order_by(Alert.created_at.desc()).limit(limit).offset(offset)
+        if search.q:
+            stmt = stmt.where(Alert.title.ilike(f"%{search.q}%"))
+            
+        # Count total
+        count_stmt = select(func.count()).select_from(stmt.subquery())
+        total = await self._db.scalar(count_stmt)
+        
+        # Sorting
+        sort_col = getattr(Alert, sort.sort_by, Alert.created_at)
+        if sort.sort_desc:
+            stmt = stmt.order_by(sort_col.desc())
+        else:
+            stmt = stmt.order_by(sort_col.asc())
+            
+        # Pagination
+        stmt = stmt.limit(pagination.page_size).offset(pagination.offset)
         result = await self._db.execute(stmt)
-        return list(result.scalars().all())
+        items = list(result.scalars().all())
+        
+        return PaginatedResponse(
+            items=items,
+            total=total or 0,
+            page=pagination.page,
+            size=pagination.page_size,
+        )
 
     async def get_alert(self, alert_id: UUID) -> Optional[Alert]:
         stmt = select(Alert).where(Alert.id == alert_id)

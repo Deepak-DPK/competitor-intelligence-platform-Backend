@@ -21,15 +21,37 @@ class ProjectRepository:
     def __init__(self, db: AsyncSession) -> None:
         self._db = db
 
-    async def list_by_owner(self, owner_id: UUID) -> Sequence[Project]:
-        """Fetch all non-deleted projects for an owner."""
-        result = await self._db.execute(
-            select(Project)
-            .where(Project.owner_id == owner_id)
-            .where(Project.deleted_at.is_(None))
-            .order_by(Project.created_at.desc())
-        )
-        return result.scalars().all()
+    async def list_by_owner(
+        self,
+        owner_id: UUID,
+        pagination: "PaginationParams",
+        search: "SearchParams",
+        sort: "SortParams",
+    ) -> tuple[Sequence[Project], int]:
+        """Fetch all non-deleted projects for an owner with pagination."""
+        from sqlalchemy import func
+
+        stmt = select(Project).where(Project.owner_id == owner_id).where(Project.deleted_at.is_(None))
+        
+        if search.q:
+            stmt = stmt.where(Project.name.ilike(f"%{search.q}%"))
+            
+        # Count total
+        count_stmt = select(func.count()).select_from(stmt.subquery())
+        total = await self._db.scalar(count_stmt)
+        
+        # Sorting
+        sort_col = getattr(Project, sort.sort_by, Project.created_at)
+        if sort.sort_desc:
+            stmt = stmt.order_by(sort_col.desc())
+        else:
+            stmt = stmt.order_by(sort_col.asc())
+            
+        # Pagination
+        stmt = stmt.limit(pagination.page_size).offset(pagination.offset)
+        
+        result = await self._db.execute(stmt)
+        return result.scalars().all(), total or 0
 
     async def get_by_id(self, project_id: UUID) -> Optional[Project]:
         """Fetch a project by ID, ignoring deleted ones."""

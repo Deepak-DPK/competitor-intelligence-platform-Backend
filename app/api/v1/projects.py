@@ -33,13 +33,19 @@ async def create_project(
     return await service.create_project(user_id, payload)
 
 
-@router.get("", response_model=List[ProjectResponse])
+from app.api.deps import Pagination, Search, Sort
+from app.schemas.common import PaginatedResponse
+
+@router.get("", response_model=PaginatedResponse[ProjectResponse])
 async def list_projects(
     user_id: CurrentUserId,
+    pagination: Pagination,
+    search: Search,
+    sort: Sort,
     service: ProjectService = Depends(get_project_service),
-) -> List[ProjectResponse]:
+) -> PaginatedResponse[ProjectResponse]:
     """List all non-deleted projects owned by the user."""
-    return await service.list_projects(user_id)
+    return await service.list_projects(user_id, pagination, search, sort)
 
 
 @router.get("/{project_id}", response_model=ProjectResponse)

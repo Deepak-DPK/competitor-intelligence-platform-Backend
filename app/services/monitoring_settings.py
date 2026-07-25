@@ -6,7 +6,6 @@ Business logic layer for Monitoring Settings.
 
 from uuid import UUID
 
-from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.monitoring_settings import MonitoringSettings

@@ -19,6 +19,12 @@ from app.models.recommendation import Recommendation
 from app.schemas.dashboard import DashboardStatistics, RecentInsightResponse, TimelineEvent
 
 
+from cachetools import TTLCache
+
+# Module level cache for dashboard statistics (lives for 60 seconds)
+# Key: project_id (UUID), Value: DashboardStatistics
+stats_cache = TTLCache(maxsize=100, ttl=60)
+
 class DashboardService:
     def __init__(self, db: AsyncSession):
         self._db = db
@@ -26,6 +32,10 @@ class DashboardService:
     async def get_statistics(self, project_id: UUID) -> DashboardStatistics:
         """Calculate high-level dashboard metrics for a project."""
         
+        # Check cache first
+        if project_id in stats_cache:
+            return stats_cache[project_id]
+
         # 1. Total Competitors
         stmt_comp = select(func.count(Competitor.id)).where(Competitor.project_id == project_id)
         res_comp = await self._db.execute(stmt_comp)
@@ -55,11 +65,15 @@ class DashboardService:
         res_rec = await self._db.execute(stmt_rec)
         pending_recs = res_rec.scalar() or 0
 
-        return DashboardStatistics(
+        stats = DashboardStatistics(
             total_competitors=total_competitors,
             active_alerts=active_alerts,
             pending_recommendations=pending_recs
         )
+        
+        # Save to cache
+        stats_cache[project_id] = stats
+        return stats
 
     async def get_recent_insights(self, project_id: UUID, limit: int = 5) -> List[RecentInsightResponse]:
         """Fetch the most recent AI Insights for a project."""

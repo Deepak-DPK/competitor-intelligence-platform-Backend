@@ -13,6 +13,7 @@ from app.api.v1.competitors import router as competitors_router
 from app.api.v1.alerts import router as alerts_router
 from app.api.v1.dashboard import router as dashboard_router
 from app.api.v1.reports import router as reports_router
+from app.api.v1.company import router as company_router
 
 api_v1_router = APIRouter()
 
@@ -23,3 +24,4 @@ api_v1_router.include_router(competitors_router, prefix="/competitors", tags=["c
 api_v1_router.include_router(alerts_router, prefix="/alerts", tags=["alerts"])
 api_v1_router.include_router(dashboard_router, prefix="/dashboard", tags=["dashboard"])
 api_v1_router.include_router(reports_router, prefix="/reports", tags=["reports"])
+api_v1_router.include_router(company_router, prefix="/company", tags=["company"])

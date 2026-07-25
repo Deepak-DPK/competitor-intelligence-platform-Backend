@@ -26,6 +26,7 @@ from app.core.constants import API_V1_PREFIX
 from app.core.logging import get_logger, setup_logging
 from app.middleware.logging import AccessLogMiddleware
 from app.middleware.request_id import RequestIDMiddleware
+from app.core.rate_limit import setup_rate_limiting
 
 # ------------------------------------------------------------------ #
 # Bootstrap logging before anything else runs
@@ -104,6 +105,8 @@ def create_application() -> FastAPI:
         lifespan=lifespan,
     )
 
+    setup_rate_limiting(app)
+
     # ---------------------------------------------------------------- #
     # CORS
     # ---------------------------------------------------------------- #
@@ -146,6 +149,24 @@ def create_application() -> FastAPI:
                 "detail": exc.detail,
                 "request_id": getattr(request.state, "request_id", None),
                 **exc.extra,
+            },
+        )
+
+    from fastapi.exceptions import RequestValidationError
+    from fastapi.responses import JSONResponse
+
+    @app.exception_handler(RequestValidationError)
+    async def validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
+        """
+        Format Pydantic validation errors to match standard JSON error envelope.
+        """
+        errors = [{"loc": err["loc"], "msg": err["msg"], "type": err["type"]} for err in exc.errors()]
+        return JSONResponse(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            content={
+                "detail": "Validation error.",
+                "request_id": getattr(request.state, "request_id", None),
+                "errors": errors,
             },
         )
 

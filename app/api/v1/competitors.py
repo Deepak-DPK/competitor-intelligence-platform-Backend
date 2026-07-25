@@ -42,14 +42,20 @@ async def create_competitor(
     return await service.create_competitor(payload, user_id)
 
 
-@router.get("", response_model=List[CompetitorResponse])
+from app.api.deps import Pagination, Search, Sort
+from app.schemas.common import PaginatedResponse
+
+@router.get("", response_model=PaginatedResponse[CompetitorResponse])
 async def list_competitors(
     project_id: UUID = Query(..., description="ID of the project to fetch competitors for."),
     user_id: CurrentUserId = Depends(),
+    pagination: Pagination = Depends(),
+    search: Search = Depends(),
+    sort: Sort = Depends(),
     service: CompetitorService = Depends(get_competitor_service),
-) -> List[CompetitorResponse]:
+) -> PaginatedResponse[CompetitorResponse]:
     """List all non-deleted competitors for a given project."""
-    return await service.list_competitors(project_id, user_id)
+    return await service.list_competitors(project_id, user_id, pagination, search, sort)
 
 
 @router.get("/{competitor_id}", response_model=CompetitorResponse)

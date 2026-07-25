@@ -13,7 +13,7 @@ Import pattern in route files:
 from typing import Annotated, Optional
 from uuid import UUID
 
-from fastapi import Depends, HTTPException
+from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.dependencies import (   # noqa: F401 — re-exported
@@ -36,8 +36,10 @@ from app.database.session import get_db
 DBSession = Annotated[AsyncSession, Depends(get_db)]
 
 
+from app.utils.exceptions import ValidationException
+
 # ------------------------------------------------------------------ #
-# Pagination
+# Pagination, Searching, Sorting
 # ------------------------------------------------------------------ #
 
 class PaginationParams:
@@ -45,15 +47,29 @@ class PaginationParams:
 
     def __init__(self, page: int = 1, page_size: int = 20) -> None:
         if page < 1:
-            raise HTTPException(status_code=400, detail="page must be >= 1")
+            raise ValidationException(detail="page must be >= 1")
         if not (1 <= page_size <= 100):
-            raise HTTPException(status_code=400, detail="page_size must be between 1 and 100")
+            raise ValidationException(detail="page_size must be between 1 and 100")
         self.page = page
         self.page_size = page_size
         self.offset = (page - 1) * page_size
 
-
 Pagination = Annotated[PaginationParams, Depends(PaginationParams)]
+
+class SearchParams:
+    """Common search query parameters."""
+    def __init__(self, q: Optional[str] = None) -> None:
+        self.q = q
+
+Search = Annotated[SearchParams, Depends(SearchParams)]
+
+class SortParams:
+    """Common sort query parameters."""
+    def __init__(self, sort_by: Optional[str] = "created_at", sort_desc: bool = True) -> None:
+        self.sort_by = sort_by
+        self.sort_desc = sort_desc
+
+Sort = Annotated[SortParams, Depends(SortParams)]
 
 # ------------------------------------------------------------------ #
 # Public re-exports (everything routes should need from this file)
@@ -76,4 +92,10 @@ __all__ = [
     # Pagination
     "Pagination",
     "PaginationParams",
+    # Search
+    "Search",
+    "SearchParams",
+    # Sort
+    "Sort",
+    "SortParams",
 ]

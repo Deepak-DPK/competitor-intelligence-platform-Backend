@@ -7,7 +7,6 @@ Business logic layer for Competitors.
 from typing import Sequence
 from uuid import UUID
 
-from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.competitor import Competitor
@@ -15,6 +14,7 @@ from app.repositories.competitor import CompetitorRepository
 from app.repositories.monitoring_settings import MonitoringSettingsRepository
 from app.services.project import ProjectService
 from app.schemas.competitor import CompetitorCreate, CompetitorUpdate
+from app.utils.exceptions import NotFoundException
 
 
 class CompetitorService:
@@ -24,17 +24,33 @@ class CompetitorService:
         self._monitoring_repo = MonitoringSettingsRepository(db)
         self._project_svc = ProjectService(db)
 
-    async def list_competitors(self, project_id: UUID, user_id: UUID) -> Sequence[Competitor]:
-        """List competitors for a project, verifying project ownership."""
+    async def list_competitors(
+        self,
+        project_id: UUID,
+        user_id: UUID,
+        pagination: "PaginationParams",
+        search: "SearchParams",
+        sort: "SortParams",
+    ) -> "PaginatedResponse[Competitor]":
+        """List competitors for a project with pagination, verifying project ownership."""
+        from app.schemas.common import PaginatedResponse
+
         # This will raise 404/403 if project doesn't exist or isn't owned by user
         await self._project_svc.get_project(project_id, user_id)
-        return await self._repo.list_by_project(project_id)
+        
+        items, total = await self._repo.list_by_project(project_id, pagination, search, sort)
+        return PaginatedResponse(
+            items=items,
+            total=total,
+            page=pagination.page,
+            size=pagination.page_size,
+        )
 
     async def get_competitor(self, competitor_id: UUID, user_id: UUID) -> Competitor:
         """Get a specific competitor, verifying its parent project ownership."""
         competitor = await self._repo.get_by_id(competitor_id)
         if not competitor:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Competitor not found")
+            raise NotFoundException(detail="Competitor not found")
         # Verify ownership
         await self._project_svc.get_project(competitor.project_id, user_id)
         return competitor

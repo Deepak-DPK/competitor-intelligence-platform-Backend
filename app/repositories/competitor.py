@@ -21,15 +21,37 @@ class CompetitorRepository:
     def __init__(self, db: AsyncSession) -> None:
         self._db = db
 
-    async def list_by_project(self, project_id: UUID) -> Sequence[Competitor]:
-        """Fetch all non-deleted competitors for a given project."""
-        result = await self._db.execute(
-            select(Competitor)
-            .where(Competitor.project_id == project_id)
-            .where(Competitor.deleted_at.is_(None))
-            .order_by(Competitor.created_at.desc())
-        )
-        return result.scalars().all()
+    async def list_by_project(
+        self,
+        project_id: UUID,
+        pagination: "PaginationParams",
+        search: "SearchParams",
+        sort: "SortParams",
+    ) -> tuple[Sequence[Competitor], int]:
+        """Fetch all non-deleted competitors for a given project with pagination."""
+        from sqlalchemy import func
+
+        stmt = select(Competitor).where(Competitor.project_id == project_id).where(Competitor.deleted_at.is_(None))
+        
+        if search.q:
+            stmt = stmt.where(Competitor.name.ilike(f"%{search.q}%"))
+            
+        # Count total
+        count_stmt = select(func.count()).select_from(stmt.subquery())
+        total = await self._db.scalar(count_stmt)
+        
+        # Sorting
+        sort_col = getattr(Competitor, sort.sort_by, Competitor.created_at)
+        if sort.sort_desc:
+            stmt = stmt.order_by(sort_col.desc())
+        else:
+            stmt = stmt.order_by(sort_col.asc())
+            
+        # Pagination
+        stmt = stmt.limit(pagination.page_size).offset(pagination.offset)
+        
+        result = await self._db.execute(stmt)
+        return result.scalars().all(), total or 0
 
     async def get_by_id(self, competitor_id: UUID) -> Optional[Competitor]:
         """Fetch a single competitor by ID."""

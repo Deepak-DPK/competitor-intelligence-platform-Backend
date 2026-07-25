@@ -64,6 +64,8 @@ httpx==0.27.2                      # async HTTP client (also used by FastAPI tes
 python-dotenv==1.0.1
 tenacity==9.0.0                    # retry logic
 orjson==3.10.12                    # fast JSON serialiser
+slowapi==0.1.9                     # rate limiting
+cachetools==5.3.3                  # in-memory caching
 
 # ----------------------------------------------------------------
 # Testing

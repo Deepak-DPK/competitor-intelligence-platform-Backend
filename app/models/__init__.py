@@ -38,6 +38,10 @@ from app.models.ai_insight import AIInsight                   # noqa: F401
 # ── Tier 5: depends on AIInsight ────────────────────────────────────────
 from app.models.recommendation import Recommendation          # noqa: F401
 
+# ── Tier 6: depends on Project ──────────────────────────────────────────
+from app.models.company_profile import CompanyProfile           # noqa: F401
+from app.models.competitor_suggestion import CompetitorSuggestion # noqa: F401
+
 # ── Public re-exports (convenience) ────────────────────────────────────
 __all__ = [
     "User",
@@ -56,5 +60,6 @@ __all__ = [
     "Alert",
     "Report",
     "ActivityLog",
+    "CompanyProfile",
+    "CompetitorSuggestion",
 ]
-
