@@ -1,0 +1,66 @@
+# ==============================================================
+# render.yaml
+# AI Hotel Booking Competitor Intelligence Platform — Backend
+# ==============================================================
+# Infrastructure-as-Code for Render deployment.
+# Commit this file to your repo; Render reads it automatically.
+#
+# Docs: https://render.com/docs/render-yaml-spec
+# ==============================================================
+
+services:
+  - type: web
+    name: competitor-intelligence-api
+    runtime: docker                    # Use the repo Dockerfile
+    region: oregon                     # us-west-2; change to nearest region
+    plan: starter                      # Upgrade to standard for production SLAs
+
+    # Docker context is the backend/ folder
+    dockerfilePath: ./Dockerfile
+
+    # ── Build ──────────────────────────────────────────────────
+    buildCommand: ""                   # Docker handles the build
+
+    # ── Start ──────────────────────────────────────────────────
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+
+    # ── Health check ───────────────────────────────────────────
+    healthCheckPath: /api/v1/health
+
+    # ── Auto-deploy on push ────────────────────────────────────
+    autoDeploy: true
+
+    # ── Environment Variables ──────────────────────────────────
+    # Set sensitive values in the Render Dashboard (not here).
+    # Only non-secret defaults are listed below.
+    envVars:
+      - key: APP_NAME
+        value: Competitor Intelligence
+
+      - key: ENVIRONMENT
+        value: production
+
+      - key: DEBUG
+        value: "False"
+
+      - key: LOG_LEVEL
+        value: INFO
+
+      - key: ALGORITHM
+        value: HS256
+
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: "1440"
+
+      - key: PLAYWRIGHT_BROWSERS_PATH
+        value: "0"
+
+      # ── Secrets (set in Render Dashboard) ───────────────────
+      # SECRET_KEY
+      # DATABASE_URL          postgresql+asyncpg://USER:PWD@HOST:5432/postgres
+      # SUPABASE_URL
+      # SUPABASE_KEY
+      # SUPABASE_JWT_SECRET
+      # GEMINI_API_KEY
+      # JINA_API_KEY
+      # FRONTEND_URL
