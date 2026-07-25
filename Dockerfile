@@ -15,7 +15,8 @@ FROM python:3.12-slim AS builder
 
 # Prevent .pyc files and enable unbuffered stdout
 ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    PLAYWRIGHT_BROWSERS_PATH=/opt/playwright
 
 WORKDIR /build
 
@@ -36,8 +37,9 @@ COPY requirements.txt .
 RUN pip install --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
-# Install Playwright browser binaries (Chromium only for scraping)
-RUN playwright install chromium --with-deps
+# Download Playwright browser binaries (Chromium only for scraping)
+# We do NOT use --with-deps here because this OS layer is discarded.
+RUN playwright install chromium
 
 
 # ── Stage 2: Runtime ──────────────────────────────────────────
@@ -49,32 +51,23 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     # Render sets PORT; Uvicorn will bind to it.
     PORT=8000 \
     # Tell Playwright where to find the installed browsers
-    PLAYWRIGHT_BROWSERS_PATH=/opt/venv/lib/python3.12/site-packages/playwright/driver/package/.local-browsers
+    PLAYWRIGHT_BROWSERS_PATH=/opt/playwright
 
 WORKDIR /app
 
-# Runtime OS libraries required by asyncpg / psycopg / lxml + Playwright
+# Copy venv from builder (includes python packages & playwright CLI)
+COPY --from=builder /opt/venv /opt/venv
+# Copy downloaded playwright browsers
+COPY --from=builder /opt/playwright /opt/playwright
+
+# Runtime OS libraries required by asyncpg / psycopg / lxml
+# Plus install Playwright OS dependencies using playwright CLI
 RUN apt-get update && apt-get install -y --no-install-recommends \
         libpq5 \
         libxml2 \
         libxslt1.1 \
-        # Playwright runtime deps (Chromium headless)
-        libnss3 \
-        libnspr4 \
-        libatk1.0-0 \
-        libatk-bridge2.0-0 \
-        libcups2 \
-        libdrm2 \
-        libxkbcommon0 \
-        libxcomposite1 \
-        libxdamage1 \
-        libxrandr2 \
-        libgbm1 \
-        libasound2 \
+    && playwright install-deps chromium \
     && rm -rf /var/lib/apt/lists/*
-
-# Copy venv from builder (includes Playwright browsers)
-COPY --from=builder /opt/venv /opt/venv
 
 # Copy application source
 COPY . .
@@ -82,7 +75,8 @@ COPY . .
 # Non-root user for security
 RUN addgroup --system appgroup && \
     adduser --system --ingroup appgroup appuser && \
-    chown -R appuser:appgroup /app
+    chown -R appuser:appgroup /app && \
+    chown -R appuser:appgroup /opt/playwright
 USER appuser
 
 # Expose port (Render overrides via $PORT env var)
