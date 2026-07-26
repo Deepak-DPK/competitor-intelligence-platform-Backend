@@ -20,7 +20,7 @@ logger = get_logger(__name__)
 class CompanyAnalyzer:
     """
     Independent service for analyzing a company website and extracting
-    business profiles using Jina AI Reader and Google Gemini.
+    business profiles using Firecrawl Cloud API and Google Gemini.
     """
     
     def __init__(self, db: AsyncSession):
@@ -33,22 +33,15 @@ class CompanyAnalyzer:
 
     async def extract_markdown(self, url: str) -> str:
         """
-        Uses Jina AI Reader to fetch the website as clean markdown.
+        Uses Firecrawl Cloud API to fetch the website as clean markdown.
         """
-        jina_url = f"https://r.jina.ai/{url}"
-        headers = {"Authorization": f"Bearer {settings.JINA_API_KEY}"} if settings.JINA_API_KEY else {}
-
-        async with httpx.AsyncClient(verify=False) as client:
-            try:
-                resp = await client.get(jina_url, headers=headers, timeout=30.0)
-                if resp.status_code == 200:
-                    return resp.text
-                else:
-                    logger.warning(f"Jina AI extraction failed with status {resp.status_code}")
-                    return ""
-            except Exception as e:
-                logger.error("Jina API call error", extra={"error": str(e)})
-                return ""
+        from app.services.monitoring.firecrawl_service import FirecrawlService
+        fc_service = FirecrawlService()
+        try:
+            return await fc_service.extract_markdown(url)
+        except Exception as e:
+            logger.error("Firecrawl API call error", extra={"error": str(e)})
+            return ""
 
     async def analyze(self, project_id: str, website: str) -> CompanyProfile:
         """

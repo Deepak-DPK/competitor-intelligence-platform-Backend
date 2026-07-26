@@ -8,7 +8,7 @@ Schema (from Database Design Document):
     competitor_id    UUID FK   → competitors.id
     page_url         TEXT      NOT NULL
     html_hash        TEXT      — SHA-256 of raw HTML (change detection key)
-    markdown_content TEXT      — cleaned markdown from Jina AI Reader
+    markdown_content TEXT      — cleaned markdown from Firecrawl Cloud API
     captured_at      TIMESTAMPTZ NOT NULL  default now()
 
 This table is IMMUTABLE (append-only).  Never UPDATE or DELETE rows;
@@ -35,7 +35,7 @@ if TYPE_CHECKING:
 class WebsiteSnapshot(Base):
     """
     Immutable point-in-time snapshot of a competitor's web page.
-    Captured by Playwright → cleaned by Jina AI Reader → stored here.
+    Captured by Playwright → cleaned by Firecrawl Cloud API → stored here.
     """
 
     __tablename__ = "website_snapshots"
@@ -76,7 +76,7 @@ class WebsiteSnapshot(Base):
     markdown_content: Mapped[Optional[str]] = mapped_column(
         Text,
         nullable=True,
-        doc="Cleaned markdown representation of the page (from Jina AI Reader).",
+        doc="Cleaned markdown representation of the page (from Firecrawl Cloud API).",
     )
     captured_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

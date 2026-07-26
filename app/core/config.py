@@ -68,7 +68,7 @@ class Settings(BaseSettings):
     # External AI / Scraping Services
     # ------------------------------------------------------------------ #
     GEMINI_API_KEY: str = Field(..., description="Google Gemini API key")
-    JINA_API_KEY: str = Field(..., description="Jina AI Reader API key")
+    FIRECRAWL_API_KEY: str = Field(..., description="Firecrawl Cloud API key")
 
     # ------------------------------------------------------------------ #
     # CORS

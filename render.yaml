@@ -63,5 +63,5 @@ services:
       # SUPABASE_KEY
       # SUPABASE_JWT_SECRET
       # GEMINI_API_KEY
-      # JINA_API_KEY
+      # FIRECRAWL_API_KEY
       # FRONTEND_URL

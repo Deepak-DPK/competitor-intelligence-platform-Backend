@@ -40,25 +40,21 @@ class WebsiteScraper(BaseScraper):
             script.extract()
         fallback_text = soup.get_text(separator="\n", strip=True)
 
-        # 4. Try fetching clean Markdown using Jina AI Reader
+        # 4. Try fetching clean Markdown using Firecrawl Cloud API
         markdown_content = fallback_text
         try:
-            import httpx
-            from app.core.config import settings
+            from app.services.monitoring.firecrawl_service import FirecrawlService
             
-            # Using Jina Reader API: https://r.jina.ai/{url}
-            jina_url = f"https://r.jina.ai/{url}"
-            headers = {"Authorization": f"Bearer {settings.JINA_API_KEY}"} if settings.JINA_API_KEY else {}
+            fc_service = FirecrawlService()
+            fc_markdown = await fc_service.extract_markdown(url)
             
-            async with httpx.AsyncClient() as client:
-                resp = await client.get(jina_url, headers=headers, timeout=30.0)
-                if resp.status_code == 200:
-                    markdown_content = resp.text
-                    self.logger.info("Jina AI extraction successful")
-                else:
-                    self.logger.warning("Jina AI extraction failed, using BS4 fallback", extra={"status_code": resp.status_code})
+            if fc_markdown:
+                markdown_content = fc_markdown
+                self.logger.info("Firecrawl extraction successful")
+            else:
+                self.logger.warning("Firecrawl extraction returned empty, using BS4 fallback")
         except Exception as e:
-            self.logger.error("Jina API call error", extra={"error": str(e)})
+            self.logger.error("Firecrawl API call error, using BS4 fallback", extra={"error": str(e)})
 
         # 5. Save the snapshot to the database
         snapshot = WebsiteSnapshot(
