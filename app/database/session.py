@@ -37,6 +37,11 @@ def _make_engine() -> AsyncEngine:
     if settings.is_production:
         connect_args["ssl"] = "require"
 
+    # Supabase Transaction Pooler uses pgbouncer which doesn't support
+    # asyncpg's prepared statement cache. Disable it to avoid
+    # DuplicatePreparedStatementError.
+    connect_args["statement_cache_size"] = 0
+
     kwargs = {
         "echo": settings.DEBUG,
         "pool_pre_ping": True,
