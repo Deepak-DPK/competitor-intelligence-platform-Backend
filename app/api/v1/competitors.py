@@ -46,11 +46,11 @@ async def create_competitor(
 
 @router.get("", response_model=PaginatedResponse[CompetitorResponse])
 async def list_competitors(
-    project_id: UUID = Query(..., description="ID of the project to fetch competitors for."),
-    user_id: CurrentUserId = None,
+    user_id: CurrentUserId,
     pagination: Pagination,
     search: Search,
     sort: Sort,
+    project_id: UUID = Query(..., description="ID of the project to fetch competitors for."),
     service: CompetitorService = Depends(get_competitor_service),
 ) -> PaginatedResponse[CompetitorResponse]:
     """List all non-deleted competitors for a given project."""
