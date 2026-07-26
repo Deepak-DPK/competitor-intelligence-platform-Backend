@@ -1,15 +1,15 @@
 """
 alembic/env.py
 --------------
-Alembic runtime environment for SQLAlchemy 2 async engine.
+Alembic runtime environment.
 
 Key design decisions:
-- Uses asyncio.run() to drive the async engine from synchronous Alembic CLI.
+- Uses SYNCHRONOUS psycopg driver for migrations (avoids pgbouncer asyncpg issues).
+- The app itself still uses asyncpg for async performance.
 - Imports Base and all models so autogenerate can detect schema changes.
 - DATABASE_URL is sourced from app.core.config (which reads .env).
 """
 
-import asyncio
 import os
 import sys
 from logging.config import fileConfig
@@ -18,9 +18,7 @@ from logging.config import fileConfig
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 from alembic import context
-from sqlalchemy import pool
-from sqlalchemy.engine import Connection
-from sqlalchemy.ext.asyncio import async_engine_from_config
+from sqlalchemy import engine_from_config, pool
 
 # ------------------------------------------------------------------ #
 # Project imports
@@ -29,17 +27,35 @@ from app.core.config import settings
 from app.database.base import Base
 
 # Import all models so Alembic autogenerate can see them.
-# Add new model imports here as they are created in Phase 2+.
-import app.models  # noqa: F401  (registers models against Base.metadata)
+import app.models  # noqa: F401
 
 # ------------------------------------------------------------------ #
-# Alembic Config object (provides access to alembic.ini values)
+# Build a synchronous psycopg URL from the asyncpg URL
+# ------------------------------------------------------------------ #
+def _get_sync_url() -> str:
+    """
+    Converts postgresql+asyncpg://... to postgresql+psycopg://...
+    so Alembic can use the synchronous psycopg driver.
+    This avoids pgbouncer DuplicatePreparedStatementError.
+    """
+    url = settings.DATABASE_URL
+    # Replace asyncpg dialect with psycopg
+    url = url.replace("postgresql+asyncpg://", "postgresql+psycopg://")
+    # Handle plain postgresql:// as well
+    if url.startswith("postgresql://") and "asyncpg" not in url:
+        url = url.replace("postgresql://", "postgresql+psycopg://", 1)
+    return url
+
+
+SYNC_DATABASE_URL = _get_sync_url()
+
+# ------------------------------------------------------------------ #
+# Alembic Config object
 # ------------------------------------------------------------------ #
 config = context.config
 
-# Override sqlalchemy.url from config file with the runtime value
-# We replace '%' with '%%' to prevent configparser from treating password characters (like %40) as interpolation variables.
-config.set_main_option("sqlalchemy.url", settings.DATABASE_URL.replace("%", "%%"))
+# Override sqlalchemy.url — escape % to avoid configparser interpolation
+config.set_main_option("sqlalchemy.url", SYNC_DATABASE_URL.replace("%", "%%"))
 
 # Interpret the config file for Python logging (if present)
 if config.config_file_name is not None:
@@ -50,14 +66,9 @@ target_metadata = Base.metadata
 
 
 # ------------------------------------------------------------------ #
-# Offline migrations  (no live DB connection needed)
+# Offline migrations
 # ------------------------------------------------------------------ #
-
 def run_migrations_offline() -> None:
-    """
-    Run migrations in 'offline' mode — emit SQL to stdout / file without
-    connecting to the database.  Useful for generating SQL scripts.
-    """
     url = config.get_main_option("sqlalchemy.url")
     context.configure(
         url=url,
@@ -67,48 +78,29 @@ def run_migrations_offline() -> None:
         compare_type=True,
         compare_server_default=True,
     )
-
     with context.begin_transaction():
         context.run_migrations()
 
 
 # ------------------------------------------------------------------ #
-# Online migrations  (live DB connection via async engine)
+# Online migrations  (synchronous psycopg — no prepared stmt issues)
 # ------------------------------------------------------------------ #
-
-def do_run_migrations(connection: Connection) -> None:
-    context.configure(
-        connection=connection,
-        target_metadata=target_metadata,
-        compare_type=True,
-        compare_server_default=True,
-    )
-    with context.begin_transaction():
-        context.run_migrations()
-
-
-async def run_async_migrations() -> None:
-    """Run migrations using the async engine."""
-    from sqlalchemy.ext.asyncio import create_async_engine
-
-    connectable = create_async_engine(
-        settings.DATABASE_URL,
-        poolclass=pool.NullPool,
-        connect_args={
-            "statement_cache_size": 0,
-            "prepared_statement_cache_size": 0,
-        },
-    )
-
-    async with connectable.connect() as connection:
-        await connection.run_sync(do_run_migrations)
-
-    await connectable.dispose()
-
-
 def run_migrations_online() -> None:
-    """Entry point for online mode — wraps async runner in asyncio.run()."""
-    asyncio.run(run_async_migrations())
+    connectable = engine_from_config(
+        config.get_section(config.config_ini_section, {}),
+        prefix="sqlalchemy.",
+        poolclass=pool.NullPool,
+    )
+
+    with connectable.connect() as connection:
+        context.configure(
+            connection=connection,
+            target_metadata=target_metadata,
+            compare_type=True,
+            compare_server_default=True,
+        )
+        with context.begin_transaction():
+            context.run_migrations()
 
 
 # ------------------------------------------------------------------ #
