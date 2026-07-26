@@ -51,7 +51,7 @@ class CompanyAnalyzer:
         
         if not markdown:
             # Fallback could be implemented here using Playwright/BS4 if desired, 
-            # but for now we rely on Jina for clean markdown.
+            # but for now we rely on Firecrawl for clean markdown.
             markdown = f"Failed to fetch content for {website}."
 
         structured_data = await self._run_gemini_extraction(website, markdown)
