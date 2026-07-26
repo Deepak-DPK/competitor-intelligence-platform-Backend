@@ -11,8 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
-from app.api.dependencies.auth import get_current_user
-from app.api.dependencies.db import get_db
+from app.api.deps import get_db, get_current_user
 from app.models.user import User
 from app.models.company_profile import CompanyProfile
 from app.models.competitor import Competitor
