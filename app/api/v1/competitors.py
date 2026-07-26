@@ -48,9 +48,9 @@ async def create_competitor(
 async def list_competitors(
     project_id: UUID = Query(..., description="ID of the project to fetch competitors for."),
     user_id: CurrentUserId = None,
-    pagination: Pagination = Depends(),
-    search: Search = Depends(),
-    sort: Sort = Depends(),
+    pagination: Pagination,
+    search: Search,
+    sort: Sort,
     service: CompetitorService = Depends(get_competitor_service),
 ) -> PaginatedResponse[CompetitorResponse]:
     """List all non-deleted competitors for a given project."""
