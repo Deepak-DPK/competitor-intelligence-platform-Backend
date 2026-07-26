@@ -41,6 +41,7 @@ def _make_engine() -> AsyncEngine:
     # asyncpg's prepared statement cache. Disable it to avoid
     # DuplicatePreparedStatementError.
     connect_args["statement_cache_size"] = 0
+    connect_args["prepared_statement_cache_size"] = 0
 
     kwargs = {
         "echo": settings.DEBUG,
