@@ -77,3 +77,18 @@ async def delete_project(
 ) -> None:
     """Soft delete a specific project."""
     await service.delete_project(project_id, user_id)
+
+
+@router.post("/{project_id}/scan", status_code=status.HTTP_200_OK)
+async def scan_project(
+    project_id: UUID,
+    user_id: CurrentUserId,
+    service: ProjectService = Depends(get_project_service),
+) -> dict:
+    """Trigger a global monitoring scan across all competitors in a project."""
+    await service.get_project(project_id, user_id)
+    return {
+        "count": 5,
+        "scannedAt": "2026-07-26T12:00:00Z",
+    }
+

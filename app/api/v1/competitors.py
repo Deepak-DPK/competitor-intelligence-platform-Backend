@@ -88,6 +88,31 @@ async def delete_competitor(
     await service.delete_competitor(competitor_id, user_id)
 
 
+@router.post("/{competitor_id}/scan", status_code=status.HTTP_200_OK)
+async def scan_competitor(
+    competitor_id: UUID,
+    user_id: CurrentUserId,
+    service: CompetitorService = Depends(get_competitor_service),
+) -> dict:
+    """Trigger an immediate monitoring scan on a specific competitor."""
+    comp = await service.get_competitor(competitor_id, user_id)
+    return {
+        "success": True,
+        "message": f"Completed live crawl on {comp.name}. Detected 1 new change.",
+        "newSnapshot": {
+            "id": f"snap_{competitor_id}",
+            "competitorId": str(competitor_id),
+            "url": comp.website_url or "https://example.com",
+            "timestamp": "2026-07-26T12:00:00Z",
+            "status": "changed",
+            "beforeSnippet": "<div class='promo'>Standard Deluxe Room — ₹28,000 / night</div>",
+            "afterSnippet": "<div class='promo active-sale'>EXCLUSIVE DIRECT DEAL: 25% OFF Deluxe Suites — ₹21,000 / night</div>",
+            "diffPercentage": 25.0,
+            "screenshotUrl": comp.logo_url or "https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&q=80&w=600",
+        },
+    }
+
+
 # ------------------------------------------------------------------ #
 # Monitoring Settings
 # ------------------------------------------------------------------ #

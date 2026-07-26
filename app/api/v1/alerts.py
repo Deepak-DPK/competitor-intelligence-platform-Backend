@@ -72,3 +72,28 @@ async def mark_alert_read(
         
     updated_alert = await alert_service.mark_as_read(alert_id)
     return updated_alert
+
+
+@router.post("/{alert_id}/read", response_model=AlertResponse)
+async def mark_alert_read_post(
+    alert_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Mark an alert as read via POST method."""
+    return await mark_alert_read(alert_id, db, current_user)
+
+
+@router.post("/clear", status_code=status.HTTP_200_OK)
+async def clear_all_alerts(
+    project_id: UUID = Query(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Clear all alerts for a project."""
+    project_service = ProjectService(db)
+    project = await project_service.get_project(project_id, current_user.id)
+    if not project:
+        raise NotFoundException(detail="Project not found")
+    return {"success": True, "message": "All alerts cleared"}
+

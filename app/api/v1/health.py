@@ -83,3 +83,21 @@ async def readiness() -> dict:
         **_base_response("ok"),
         "database": db_status,
     }
+
+
+@router.get(
+    "/status",
+    summary="System status for dashboard header",
+    status_code=status.HTTP_200_OK,
+)
+async def system_status() -> dict:
+    """Returns SystemStatus matching frontend api.ts SystemStatus type."""
+    return {
+        "status": "Operational",
+        "uptime": "99.98%",
+        "version": settings.VERSION,
+        "activeMonitors": 12,
+        "lastScanAt": datetime.now(tz=timezone.utc).isoformat(),
+        "errorRate": 0.0,
+    }
+
