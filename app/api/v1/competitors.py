@@ -16,6 +16,8 @@ from app.schemas.competitor import CompetitorCreate, CompetitorResponse, Competi
 from app.schemas.monitoring_settings import MonitoringSettingsResponse, MonitoringSettingsUpdate
 from app.services.competitor import CompetitorService
 from app.services.monitoring_settings import MonitoringSettingsService
+from app.api.deps import Pagination, Search, Sort
+from app.schemas.common import PaginatedResponse
 
 router = APIRouter(prefix="/competitors", tags=["competitors"])
 
@@ -42,13 +44,10 @@ async def create_competitor(
     return await service.create_competitor(payload, user_id)
 
 
-from app.api.deps import Pagination, Search, Sort
-from app.schemas.common import PaginatedResponse
-
 @router.get("", response_model=PaginatedResponse[CompetitorResponse])
 async def list_competitors(
     project_id: UUID = Query(..., description="ID of the project to fetch competitors for."),
-    user_id: CurrentUserId = Depends(),
+    user_id: CurrentUserId = None,
     pagination: Pagination = Depends(),
     search: Search = Depends(),
     sort: Sort = Depends(),
