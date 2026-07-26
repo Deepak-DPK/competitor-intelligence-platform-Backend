@@ -30,7 +30,7 @@ from app.services.company_analysis import (
     GeminiSearchProvider
 )
 
-router = APIRouter()
+router = APIRouter(prefix="/company", tags=["company"])
 
 
 @router.post("/analyze", response_model=CompanyProfileResponse, status_code=status.HTTP_201_CREATED)
