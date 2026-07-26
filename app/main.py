@@ -135,6 +135,7 @@ def create_application() -> FastAPI:
     # ---------------------------------------------------------------- #
     # Global exception handlers
     # ---------------------------------------------------------------- #
+    from fastapi.responses import JSONResponse
     from app.utils.exceptions import AppException
 
     @app.exception_handler(AppException)
@@ -153,7 +154,6 @@ def create_application() -> FastAPI:
         )
 
     from fastapi.exceptions import RequestValidationError
-    from fastapi.responses import JSONResponse
 
     @app.exception_handler(RequestValidationError)
     async def validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
