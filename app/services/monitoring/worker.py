@@ -9,7 +9,7 @@ import asyncio
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from app.core.logging import get_logger
-from app.database.session import _TestSessionLocal, engine
+from app.database.session import AsyncSessionLocal, engine
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import sessionmaker
 
@@ -23,10 +23,7 @@ from app.services.monitoring.scrapers.advertising import AdvertisingScraper
 
 logger = get_logger(__name__)
 
-# Use the app's async sessionmaker
-AsyncSessionLocal = sessionmaker(
-    engine, class_=AsyncSession, expire_on_commit=False
-)
+
 
 
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
