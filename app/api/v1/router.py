@@ -18,7 +18,7 @@ from app.api.v1.company import router as company_router
 api_v1_router = APIRouter()
 
 api_v1_router.include_router(health_router)
-api_v1_router.include_router(auth_router, prefix="/auth")
+api_v1_router.include_router(auth_router)
 api_v1_router.include_router(projects_router)
 api_v1_router.include_router(competitors_router)
 api_v1_router.include_router(alerts_router, prefix="/alerts")

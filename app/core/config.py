@@ -68,7 +68,7 @@ class Settings(BaseSettings):
     # External AI / Scraping Services
     # ------------------------------------------------------------------ #
     GEMINI_API_KEY: str = Field(..., description="Google Gemini API key")
-    FIRECRAWL_API_KEY: str = Field(..., description="Firecrawl Cloud API key")
+    FIRECRAWL_API_KEY: str = Field(default="fc-local-test-key", description="Firecrawl Cloud API key")
 
     # ------------------------------------------------------------------ #
     # CORS
@@ -87,7 +87,13 @@ class Settings(BaseSettings):
     @property
     def cors_origins(self) -> List[str]:
         """Returns the list of allowed CORS origins."""
-        origins = [self.FRONTEND_URL, "http://localhost:3000", "http://localhost:3001"]
+        origins = [
+            self.FRONTEND_URL,
+            "http://localhost:3000",
+            "http://localhost:3001",
+            "http://localhost:5173",
+            "http://127.0.0.1:5173",
+        ]
         return list(dict.fromkeys(origins))  # deduplicate while preserving order
 
     # ------------------------------------------------------------------ #

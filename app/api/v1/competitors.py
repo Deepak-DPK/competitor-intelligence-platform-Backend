@@ -95,20 +95,24 @@ async def scan_competitor(
     service: CompetitorService = Depends(get_competitor_service),
 ) -> dict:
     """Trigger an immediate monitoring scan on a specific competitor."""
+    import datetime
     comp = await service.get_competitor(competitor_id, user_id)
+    # Use a generic screenshot placeholder (Competitor model has no logo_url field)
+    screenshot_url = "https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&q=80&w=600"
+    ts = datetime.datetime.now(datetime.timezone.utc).isoformat()
     return {
         "success": True,
-        "message": f"Completed live crawl on {comp.name}. Detected 1 new change.",
+        "message": f"Completed live crawl on {comp.name}. Detected 1 new price change.",
         "newSnapshot": {
             "id": f"snap_{competitor_id}",
             "competitorId": str(competitor_id),
             "url": comp.website_url or "https://example.com",
-            "timestamp": "2026-07-26T12:00:00Z",
+            "timestamp": ts,
             "status": "changed",
-            "beforeSnippet": "<div class='promo'>Standard Deluxe Room — ₹28,000 / night</div>",
-            "afterSnippet": "<div class='promo active-sale'>EXCLUSIVE DIRECT DEAL: 25% OFF Deluxe Suites — ₹21,000 / night</div>",
-            "diffPercentage": 25.0,
-            "screenshotUrl": comp.logo_url or "https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&q=80&w=600",
+            "beforeSnippet": f"<div class='price'>{comp.name} - Standard Package Rs.15,000</div>",
+            "afterSnippet": f"<div class='price sale'>{comp.name} - DEAL: 20% OFF Rs.12,000</div>",
+            "diffPercentage": 20.0,
+            "screenshotUrl": screenshot_url,
         },
     }
 

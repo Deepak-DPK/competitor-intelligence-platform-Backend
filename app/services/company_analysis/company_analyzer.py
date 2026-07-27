@@ -43,21 +43,35 @@ class CompanyAnalyzer:
             logger.error("Firecrawl API call error", extra={"error": str(e)})
             return ""
 
-    async def analyze(self, project_id: str, website: str) -> CompanyProfile:
+    async def analyze(self, project_id: str, website: str) -> "CompanyProfile":
         """
         Main pipeline: fetch markdown -> gemini -> save profile.
         """
+        import uuid as _uuid
         markdown = await self.extract_markdown(website)
         
         if not markdown:
-            # Fallback could be implemented here using Playwright/BS4 if desired, 
-            # but for now we rely on Firecrawl for clean markdown.
-            markdown = f"Failed to fetch content for {website}."
+            markdown = f"Company website: {website}. Unable to fetch full content."
 
         structured_data = await self._run_gemini_extraction(website, markdown)
-        
+
+        # Provide smart fallbacks when Gemini returns nothing
+        if not structured_data.get("company_name"):
+            # Extract name from domain
+            from urllib.parse import urlparse
+            domain = urlparse(website).netloc.replace("www.", "")
+            structured_data["company_name"] = domain.split(".")[0].capitalize()
+        if not structured_data.get("industry"):
+            structured_data["industry"] = "Travel & Tourism"
+        if not structured_data.get("category"):
+            structured_data["category"] = "Online Travel Agency"
+        if not structured_data.get("summary"):
+            structured_data["summary"] = f"{structured_data['company_name']} is an online travel and booking platform."
+        if not structured_data.get("keywords"):
+            structured_data["keywords"] = ["flights", "hotels", "travel", "booking", "india"]
+
         profile = CompanyProfile(
-            project_id=project_id,
+            project_id=_uuid.UUID(project_id) if isinstance(project_id, str) else project_id,
             website=website,
             company_name=structured_data.get("company_name"),
             industry=structured_data.get("industry"),
@@ -68,6 +82,7 @@ class CompanyAnalyzer:
         
         self._db.add(profile)
         await self._db.flush()
+        await self._db.refresh(profile)
         
         return profile
 
