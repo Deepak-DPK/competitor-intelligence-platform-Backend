@@ -47,7 +47,7 @@ class MonitoringSettings(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         primary_key=True,
-        server_default=func.gen_random_uuid(),
+        default=uuid.uuid4,
         doc="Unique settings record identifier.",
     )
 

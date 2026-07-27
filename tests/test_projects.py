@@ -34,7 +34,9 @@ async def test_list_projects(client: AsyncClient, mock_user: User, auth_headers:
 
     response = await client.get("/api/v1/projects", headers=auth_headers)
     assert response.status_code == 200
-    data = response.json()
+    raw = response.json()
+    # API returns paginated {items: [...], total: N, ...}
+    data = raw.get("items", raw) if isinstance(raw, dict) else raw
     assert len(data) >= 2
     names = [p["name"] for p in data]
     assert "Proj 1" in names
@@ -61,5 +63,7 @@ async def test_delete_project(client: AsyncClient, auth_headers: dict):
 
     # Ensure it's not listed anymore
     list_resp = await client.get("/api/v1/projects", headers=auth_headers)
-    ids = [p["id"] for p in list_resp.json()]
+    raw = list_resp.json()
+    items = raw.get("items", raw) if isinstance(raw, dict) else raw
+    ids = [p["id"] for p in items]
     assert project_id not in ids

@@ -48,7 +48,7 @@ class Alert(TimestampMixin, Base):
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         primary_key=True,
-        server_default=func.gen_random_uuid(),
+        default=uuid.uuid4,
         doc="Unique alert identifier.",
     )
 

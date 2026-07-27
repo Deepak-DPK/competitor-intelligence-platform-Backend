@@ -123,6 +123,10 @@ class AuthService:
                 supabase_user_id = UUID(str(resp.user.id))
             supabase_session = resp.session
         except Exception as exc:
+            # Dev-only fallback: in production/test environments, propagate the error
+            if not settings.is_development:
+                logger.warning("Supabase sign-up failed: %s", exc)
+                raise UnauthorizedException("Registration failed — Supabase authentication error.") from exc
             logger.warning("Supabase sign-up failed (falling back to local dev user): %s", exc)
 
         # 3. Mirror or create into public.users
@@ -177,9 +181,13 @@ class AuthService:
                 logger.info("User logged in via Supabase", extra={"user_id": str(user.id)})
                 return AuthResponse(user=UserResponse.model_validate(user), tokens=tokens)
         except Exception as exc:
+            # Dev-only fallback: in production/test environments, propagate the 401
+            if not settings.is_development:
+                logger.warning("Supabase login failed: %s", exc)
+                raise UnauthorizedException("Invalid email or password.") from exc
             logger.warning("Supabase login failed (falling back to local dev login): %s", exc)
 
-        # Local dev fallback login
+        # Local dev fallback login (development only)
         user = await self._repo.get_by_email(payload.email)
         if not user:
             user = await self._repo.create(

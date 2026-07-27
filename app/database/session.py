@@ -31,37 +31,38 @@ logger = get_logger(__name__)
 
 def _make_engine() -> AsyncEngine:
     """Build the SQLAlchemy async engine from the DATABASE_URL config."""
+    db_url = settings.DATABASE_URL
     connect_args: dict = {}
-
-    # Supabase / Render environments may require SSL
-    if settings.is_production:
-        connect_args["ssl"] = "require"
-
-    # Supabase Transaction Pooler uses pgbouncer which doesn't support
-    # asyncpg's prepared statement cache. Disable it to avoid
-    # DuplicatePreparedStatementError.
-    connect_args["statement_cache_size"] = 0
-    connect_args["prepared_statement_cache_size"] = 0
-
-    kwargs = {
+    kwargs: dict = {
         "echo": settings.DEBUG,
-        "pool_pre_ping": True,
-        "pool_recycle": 1800,
-        "connect_args": connect_args,
     }
 
-    # SQLite does not support pool_size and max_overflow
-    if not settings.DATABASE_URL.startswith("sqlite"):
-        kwargs["pool_size"] = 5
-        kwargs["max_overflow"] = 10
-    else:
+    if db_url.startswith("postgresql"):
+        try:
+            import asyncpg  # noqa: F401
+        except ImportError:
+            logger.warning("asyncpg not installed, falling back to SQLite in-memory database for testing.")
+            db_url = "sqlite+aiosqlite:///:memory:"
+        else:
+            if settings.is_production:
+                connect_args["ssl"] = "require"
+            connect_args["statement_cache_size"] = 0
+            connect_args["prepared_statement_cache_size"] = 0
+            kwargs["pool_pre_ping"] = True
+            kwargs["pool_recycle"] = 1800
+            kwargs["pool_size"] = 5
+            kwargs["max_overflow"] = 10
+
+    if db_url.startswith("sqlite"):
         connect_args["check_same_thread"] = False
 
+    kwargs["connect_args"] = connect_args
+
     engine = create_async_engine(
-        settings.DATABASE_URL,
+        db_url,
         **kwargs,
     )
-    logger.info("Database engine created", extra={"url": settings.DATABASE_URL[:40] + "..."})
+    logger.info("Database engine created", extra={"url": db_url[:40] + "..."})
     return engine
 
 

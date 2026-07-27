@@ -79,5 +79,7 @@ async def test_delete_competitor(client: AsyncClient, auth_headers: dict, sample
     assert delete_resp.status_code == 204
 
     list_resp = await client.get(f"/api/v1/competitors?project_id={sample_project}", headers=auth_headers)
-    ids = [c["id"] for c in list_resp.json()]
+    raw = list_resp.json()
+    items = raw.get("items", raw) if isinstance(raw, dict) else raw
+    ids = [c["id"] for c in items]
     assert comp_id not in ids

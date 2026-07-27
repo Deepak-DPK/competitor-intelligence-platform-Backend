@@ -60,7 +60,7 @@ class LoginRequest(BaseModel):
 class RefreshTokenRequest(BaseModel):
     """Payload for POST /auth/refresh."""
 
-    refresh_token: str = Field(..., description="Opaque refresh token issued by Supabase.")
+    refresh_token: str = Field(..., min_length=1, description="Opaque refresh token issued by Supabase.")
 
 
 class LogoutRequest(BaseModel):
