@@ -66,8 +66,14 @@ class ProjectRepository:
         project = Project(
             owner_id=owner_id,
             name=payload.name,
-            industry=payload.industry,
+            industry=payload.industry or "Travel & Hospitality",
             description=payload.description,
+            business_type=getattr(payload, "business_type", None) or "Resort & Hospitality",
+            country=getattr(payload, "country", None) or "United States",
+            currency=getattr(payload, "currency", None) or "USD",
+            primary_destinations=getattr(payload, "primary_destinations", None),
+            monitoring_preferences=getattr(payload, "monitoring_preferences", None),
+            workspace_settings=getattr(payload, "workspace_settings", None),
         )
         self._db.add(project)
         await self._db.flush()

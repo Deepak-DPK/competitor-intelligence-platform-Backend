@@ -89,6 +89,42 @@ class Project(TimestampMixin, SoftDeleteMixin, Base):
         server_default=ProjectStatus.ACTIVE,
         doc="Project lifecycle status: active | paused | archived.",
     )
+    business_type: Mapped[Optional[str]] = mapped_column(
+        String(100),
+        nullable=True,
+        default="Resort & Hospitality",
+        server_default="Resort & Hospitality",
+        doc="Travel business type.",
+    )
+    country: Mapped[Optional[str]] = mapped_column(
+        String(100),
+        nullable=True,
+        default="United States",
+        server_default="United States",
+        doc="Operating country.",
+    )
+    currency: Mapped[str] = mapped_column(
+        String(10),
+        nullable=False,
+        default="USD",
+        server_default="USD",
+        doc="Base currency.",
+    )
+    primary_destinations: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+        doc="Comma-separated primary travel destinations.",
+    )
+    monitoring_preferences: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+        doc="JSON string of monitoring preferences.",
+    )
+    workspace_settings: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+        doc="JSON string of workspace settings.",
+    )
 
     # ------------------------------------------------------------------ #
     # Relationships
