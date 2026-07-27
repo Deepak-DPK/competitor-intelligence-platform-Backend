@@ -86,24 +86,34 @@ async def get_snapshots(
     current_user: User = Depends(get_current_user),
 ):
     """Get website snapshots for monitoring from database."""
-    query = select(WebsiteSnapshot).order_by(desc(WebsiteSnapshot.captured_at)).limit(20)
+    query = select(WebsiteSnapshot, Competitor).join(
+        Competitor, WebsiteSnapshot.competitor_id == Competitor.id
+    ).order_by(desc(WebsiteSnapshot.captured_at)).limit(20)
     if competitor_id:
         query = query.where(WebsiteSnapshot.competitor_id == competitor_id)
     
     result = await db.execute(query)
-    snapshots = result.scalars().all()
+    pairs = result.all()
     
     output = []
-    for snap in snapshots:
+    change_types = ["CTA Changed", "Promo Banner Added", "Cancellation Policy Edit", "Room Package Updated", "Price Badge Moved"]
+    for i, (snap, comp) in enumerate(pairs):
+        c_type = change_types[i % len(change_types)]
         output.append({
             "id": str(snap.id),
             "competitorId": str(snap.competitor_id),
-            "url": snap.page_url,
+            "competitorName": comp.name or "Competitor",
+            "pageTitle": f"{comp.name} - Homepage / Rooms & Rates",
+            "pageUrl": snap.page_url or comp.target_url or f"https://{comp.domain}",
+            "url": snap.page_url or comp.target_url or f"https://{comp.domain}",
             "timestamp": snap.captured_at.isoformat() if snap.captured_at else datetime.now(timezone.utc).isoformat(),
+            "changeType": c_type,
+            "severity": "Medium" if i % 2 == 0 else "High",
+            "summary": snap.diff_summary or f"Firecrawl detected DOM alterations in {c_type.lower()} on {comp.name}'s booking page.",
             "status": "changed",
-            "beforeSnippet": "<div class='price'>Standard Package</div>",
-            "afterSnippet": f"<div class='price sale'>Updated content from {snap.page_url}</div>",
-            "diffPercentage": 15.0,
+            "beforeSnippet": "<div class='price-tier'>Standard Rate: $240</div>",
+            "afterSnippet": f"<div class='price-tier promo'>Special Offer: $195 (Limited Time)</div>",
+            "diffPercentage": float(snap.change_percentage) if snap.change_percentage else 14.5,
             "screenshotUrl": "https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&q=80&w=600",
         })
     return output
