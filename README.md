@@ -1,6 +1,6 @@
-# CompeteIQ Backend — Travel Agency Intelligence API
+# CompeteIQ Backend â€” Travel Agency Intelligence API
 
-This is the backend service for the CompeteIQ Travel Intelligence Platform. It is a high-performance REST API built with FastAPI, designed to orchestrate data extraction, process analytics, and serve real-time insights to the frontend application.
+This is the backend service for the CompeteIQ Travel Intelligence Platform. It is a high-performance REST API built with FastAPI, designed to orchestrate data extraction, process analytics, and serve real-time insights to the [Frontend Application](https://github.com/Deepak-DPK/Competitor-Intelligence-Platform).
 
 ## System Architecture Overview
 
